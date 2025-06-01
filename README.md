@@ -21,3 +21,7 @@ Parse materials in blend files, display material preview in tools panel, & appen
 * Loading a max of 200 materials is a good safe range but more can be used if your PC can handle it
 * Using around 25 materisl per blend file is recomended for fast append / linking of materials
 * I store 25 materials in a blend file & have 8 blend files in a folder (200 materials total when accessed) This is optimial for my use case
+
+<img width="242" alt="Screenshot 2025-05-31 at 8 53 35 PM" src="https://github.com/user-attachments/assets/031df82e-36ae-4e93-aa87-40e4473b1a55" />
+<img width="1800" alt="Screenshot 2025-05-31 at 8 53 27 PM" src="https://github.com/user-attachments/assets/05ef9cf6-305e-4947-9b00-ded309f7b5be" />
+<img width="1912" alt="Screenshot 2025-05-31 at 9 08 11 PM" src="https://github.com/user-attachments/assets/43523d3e-088e-4137-94ea-9d3c1422aa30" />
