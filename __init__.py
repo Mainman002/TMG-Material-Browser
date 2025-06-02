@@ -13,7 +13,7 @@ bl_info = {
     "name": "TMG Material Browser",
     "author": "Johnathan Mueller",
     "version": (1, 0),
-    "blender": (4, 4, 1),
+    "blender": (4, 4, 3),
     "location": "View3D > Sidebar > TMG > Material Browser",
     "description": "Browse and manage materials from blend files",
     "category": "TMG",
@@ -94,26 +94,12 @@ KEYWORD_CATEGORIES = {
     "Debug": ["wireframe", "uv", "checker", "matcap", "normal", "test", "grid"],
 }
 
-# ----------JSON Parsing ---------
-def get_category(material_name):
-    material_name_lower = material_name.lower()
-    for category, keywords in KEYWORD_CATEGORIES.items():
-        if any(keyword in material_name_lower for keyword in keywords):
-            return category
-    return "Uncategorized"
-
-def get_category_items(self, context):
-    items = [("All", "All", "Show all materials")]
-    categories = sorted(set(item.category for item in context.scene.material_browser_items))
-    for cat in categories:
-        items.append((cat, cat, f"Category: {cat}"))
-    return items
-
 def parse_blend_file(filepath):
     materials = []
 
     blend_dir = os.path.dirname(filepath)
-    blend_name = os.path.splitext(os.path.basename(filepath))[0]
+    blend_file = os.path.basename(filepath)
+    blend_name = os.path.splitext(blend_file)[0]
     preview_folder = os.path.join(blend_dir, f"{blend_name}_Data", PREVIEW_FOLDER)
 
     with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
@@ -123,14 +109,13 @@ def parse_blend_file(filepath):
 
             preview_filename = f"{mat_name}.png"
             preview_path = os.path.join(preview_folder, preview_filename)
-
-            # If the preview image exists, use the filename. If not, fallback to ""
             preview = preview_filename if os.path.exists(preview_path) else ""
 
             materials.append({
                 "name": mat_name.strip(),
                 "category": get_category(mat_name),
-                "preview": preview
+                "preview": preview,
+                "blend_file": blend_file
             })
 
     return materials
@@ -161,38 +146,14 @@ def read_json(json_path):
         return []
 
 # ---------- CORE UTILS ----------
-def get_dynamic_categories(self, context):
-    categories = {"All"}
-    for item in context.scene.material_browser_items:
-        categories.add(item.category)
-
-    return [(cat, cat, "") for cat in sorted(categories)]
-
 def clear_preview_collection():
     if "material_thumbs" in preview_collections:
         bpy.utils.previews.remove(preview_collections["material_thumbs"])
         del preview_collections["material_thumbs"]
     gc.collect()
 
-def load_all_previews(preview_folder):
-    pcoll = preview_collections.get("material_thumbs")
-    if not pcoll:
-        pcoll = bpy.utils.previews.new()
-        preview_collections["material_thumbs"] = pcoll
-
-    pcoll.clear()  # Make sure we’re clean before loading
-
-    for f in os.listdir(preview_folder):
-        if f.lower().endswith((".png", ".jpg")):
-            path = os.path.join(preview_folder, f)
-            key = os.path.splitext(f)[0]  # match material name
-            pcoll.load(key, path, 'IMAGE')
-
 def load_all_previews(context):
-    # Clear any existing previews to avoid memory bloat
     clear_preview_collection()
-
-    # Create a fresh preview collection
     pcoll = bpy.utils.previews.new()
     preview_collections["material_thumbs"] = pcoll
 
@@ -204,7 +165,6 @@ def load_all_previews(context):
     blend_files = [f for f in os.listdir(folder_path) if f.lower().endswith(".blend")]
 
     for blend_file in blend_files:
-        # Path to the _data/previews folder for this blend
         preview_folder = os.path.join(
             folder_path,
             blend_file.replace(".blend", CACHE_SUFFIX),
@@ -225,23 +185,7 @@ def load_all_previews(context):
                     except Exception as e:
                         print(f"[MaterialBrowser] Failed to load preview {full_path}: {e}")
 
-def load_previews(preview_dir, materials):
-    for mat in materials:
-        name = mat["name"]
-        preview = mat.get("preview", "")
-        if preview:
-            img_path = os.path.join(preview_dir, preview)
-            if os.path.exists(img_path):
-                preview_images[name] = preview_collection.load(name, img_path, 'IMAGE')
-
-def unload_previews():
-    if not preview_collections:
-        for key, pcoll in preview_collections.items():
-            bpy.utils.previews.remove(pcoll)
-        preview_collections.clear()
-    gc.collect()
-
-def refresh_material_list(context, material_data_list):
+def refresh_material_list(context, material_data_list, blend_file=""):
     items = context.scene.material_browser_items
     items.clear()
 
@@ -249,7 +193,6 @@ def refresh_material_list(context, material_data_list):
         item = items.add()
         item.name = entry.get("name", "Unnamed")
         item.category = get_category(item.name)
-        # item.category = categorize_material(item.name)
         item.preview_path = os.path.join(
             context.scene.material_browser_path,
             entry["blend_file"].replace(".blend", CACHE_SUFFIX),
@@ -267,7 +210,6 @@ def find_height_texture(mat):
         return None
     for node in mat.node_tree.nodes:
         if node.type == 'TEX_IMAGE':
-            # crude heuristic: texture node name or image name contains 'height' or 'displacement'
             name = node.name.lower()
             img_name = node.image.name.lower() if node.image else ""
             if "height" in name or "displacement" in name or "height" in img_name or "displacement" in img_name:
@@ -322,8 +264,6 @@ def filter_material_browser_items(scn):
                 new_item.name = item.name
                 new_item.category = item.category
                 new_item.blend_file = item.blend_file
-
-                # Copy the preview path directly
                 new_item.preview_path = item.preview_path if item.preview_path else ""
 
     scn.material_browser_material_count = f"Materials: {len(scn.material_browser_items)}"
@@ -332,10 +272,8 @@ def filter_material_browser_items(scn):
     if len(scn.material_browser_filtered_items) > 0:
         scn.material_browser_index = 0
 
-
 def update_material_browser_filter(self, context):
     filter_material_browser_items(context.scene)
-
 
 def update_material_browser_category(self, context):
     filter_material_browser_items(context.scene)
@@ -344,13 +282,6 @@ def get_category(material_name):
     material_name_lower = material_name.lower()
     for category, keywords in KEYWORD_CATEGORIES.items():
         if any(keyword in material_name_lower for keyword in keywords):
-            return category
-    return "Uncategorized"
-
-def categorize_material(name):
-    name_lower = name.lower()
-    for keyword, category in KEYWORD_CATEGORIES.items():
-        if keyword in name_lower:
             return category
     return "Uncategorized"
 
@@ -441,7 +372,6 @@ class MATERIALBROWSER_OT_RefreshCache(bpy.types.Operator):
 
         blend_files = [f for f in os.listdir(folder_path) if f.lower().endswith(".blend")]
 
-
         for blend_file in blend_files:
             blend_path = os.path.join(folder_path, blend_file)
             cache_folder = os.path.join(folder_path, blend_file.replace(".blend", CACHE_SUFFIX))
@@ -449,15 +379,9 @@ class MATERIALBROWSER_OT_RefreshCache(bpy.types.Operator):
             context.scene.previews_folder_path = preview_folder
 
             json_path = os.path.join(cache_folder, JSON_NAME.format(blend_file.replace(".blend", "")))
-
-            # Always reparse and overwrite json cache
             mats = parse_blend_file(blend_path)
-
-            # Ensure cache folder exists
             os.makedirs(cache_folder, exist_ok=True)
             write_json(json_path, mats)
-
-            # Refresh material cache UI list from JSON data
             refresh_material_list(context, mats, blend_file)
         
         if context.scene.material_browser_filtered_items:
@@ -487,10 +411,8 @@ class MATERIALBROWSER_OT_AppendMaterial(bpy.types.Operator):
             self.report({'ERROR'}, f"Blend file not found: {blend_path}")
             return {'CANCELLED'}
 
-        # Check if material already exists in current blend
         mat = bpy.data.materials.get(material_name)
         if not mat:
-            # Append material from external blend file
             with bpy.data.libraries.load(blend_path, link=False) as (data_from, data_to):
                 if material_name in data_from.materials:
                     data_to.materials = [material_name]
@@ -501,12 +423,9 @@ class MATERIALBROWSER_OT_AppendMaterial(bpy.types.Operator):
 
         disconnect_displacement(mat, context, context.scene.enable_displacement)
 
-        # Assign material to all selected objects
         for obj in context.selected_objects:
             if obj.type == 'MESH':
-                # Clear existing materials or just add?
                 if obj.data.materials:
-                    # Replace first material slot with new mat
                     obj.data.materials[0] = mat
                 else:
                     obj.data.materials.append(mat)
@@ -532,10 +451,8 @@ class MATERIALBROWSER_OT_LinkMaterial(bpy.types.Operator):
             self.report({'ERROR'}, f"Blend file not found: {blend_path}")
             return {'CANCELLED'}
 
-        # Check if material already linked
         mat = bpy.data.materials.get(material_name)
         if not mat:
-            # Link material from external blend file
             with bpy.data.libraries.load(blend_path, link=True) as (data_from, data_to):
                 if material_name in data_from.materials:
                     data_to.materials = [material_name]
@@ -544,7 +461,6 @@ class MATERIALBROWSER_OT_LinkMaterial(bpy.types.Operator):
                 self.report({'ERROR'}, f"Material {material_name} not found in {blend_path}")
                 return {'CANCELLED'}
 
-        # Assign material to all selected objects
         for obj in context.selected_objects:
             if obj.type == 'MESH':
                 if obj.data.materials:
@@ -556,111 +472,25 @@ class MATERIALBROWSER_OT_LinkMaterial(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class MATERIALBROWSER_OT_Scan(bpy.types.Operator):
-    bl_idname = "materialbrowser.scan"
-    bl_label = "Scan Materials"
-    directory: StringProperty(subtype="DIR_PATH")
-
-    def parse_material_list(self, context):
-        self.report({'INFO'}, "Scanning materials...")
-
-        dir_path = bpy.path.abspath(context.scene.material_browser_path)
-        if not os.path.isdir(dir_path):
-            self.report({'ERROR'}, f"Invalid directory: {dir_path}")
-            return
-
-        context.scene.material_cache.folder_path = dir_path
-        context.scene.material_cache.materials.clear()
-
-        for fname in os.listdir(dir_path):
-            if fname.lower().endswith(".blend"):
-                blend_path = os.path.join(dir_path, fname)
-                name_wo_ext = os.path.splitext(fname)[0]
-                data_dir = os.path.join(dir_path, f"{name_wo_ext}{CACHE_SUFFIX}")
-                json_path = os.path.join(data_dir, JSON_NAME.format(name_wo_ext))
-
-                # Always write new JSON for fresh parsing
-                mats = parse_blend_file(blend_path)
-                write_json(json_path, mats)
-
-                # Load parsed materials from JSON
-                for mat in mats:
-                    item = context.scene.material_cache.materials.add()
-                    item.name = mat.get("name", "Unnamed")
-                    item.category = mat.get("category", "Uncategorized")
-
-                    # Combine full preview path safely
-                    preview_rel = mat.get("preview", "")
-                    item.preview_path = os.path.join(context.scene.previews_folder_path, preview_rel) if preview_rel else ""
-
-        self.report({'INFO'}, "Material scan complete.")
-        print("Material scan complete.")
-
-
-    def load_material_list(self, context):
-        folder_path = bpy.path.abspath(context.scene.material_browser_path)
-
-        if not os.path.isdir(folder_path):
-            self.report({'ERROR'}, "Invalid folder path")
-            return {'CANCELLED'}
-
-        blend_files = [f for f in os.listdir(folder_path) if f.lower().endswith(".blend")]
-
-        for blend_file in blend_files:
-            blend_path = os.path.join(folder_path, blend_file)
-            cache_folder = os.path.join(folder_path, blend_file.replace(".blend", CACHE_SUFFIX))
-            preview_folder = os.path.join(cache_folder, PREVIEW_FOLDER)
-            context.scene.previews_folder_path = preview_folder
-
-            json_path = os.path.join(cache_folder, JSON_NAME.format(blend_file.replace(".blend", "")))
-
-            # Regenerate only if missing
-            if not os.path.exists(json_path):
-                material_data = parse_blend_file(blend_path)
-                write_json(json_path, material_data)
-
-            json_data = read_json(json_path)
-            refresh_material_list(context, json_data, blend_file)
-
-    def execute(self, context):
-        self.report({'INFO'}, "Scanning in background...")
-
-        dir_path = bpy.path.abspath(context.scene.material_browser_path)
-        if not os.path.isdir(dir_path):
-            print("Invalid directory:", dir_path)
-            return {'CANCELLED'}
-
-        self.parse_material_list(context)
-        self.load_material_list(context)
-
-        self.report({'INFO'}, "Scan complete")
-        print("Scan complete.")
-        return {'FINISHED'}
-
-
 # ---------- UI Lists -----------
 class MATERIALBROWSER_UL_items(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         pcoll = preview_collections.get("material_thumbs")
-        icon_id = 0  # fallback
+        icon_id = 0
 
-        # Try to get a valid icon from the preview collection
         if pcoll and item.name in pcoll:
             icon_id = pcoll[item.name].icon_id
 
-        # Draw layout depending on type
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             row = layout.row(align=True)
-
             if icon_id > 0:
                 row.label(text="", icon_value=icon_id)
             elif pcoll:
-                row.label(text="", icon='ERROR')  # preview collection exists but icon failed
+                row.label(text="", icon='ERROR')
             else:
-                row.label(text="", icon='QUESTION')  # no preview collection at all
+                row.label(text="", icon='QUESTION')
 
             row.label(text=item.name)
-
             # split = row.split(factor=0.7)
             # split.label(text=item.name)
             # split.label(text=f"[{item.category}]")
@@ -694,12 +524,10 @@ class MATERIALBROWSER_PT_Panel(Panel):
         col.prop(scn, "material_browser_category", text="Category")
         col.label(text=scn.material_browser_material_category_count)
 
-        # Get active material item
         items = getattr(scn, "material_browser_filtered_items", None)
         index = getattr(scn, "material_browser_index", -1)
         active_item = items[index] if items and 0 <= index < len(items) else None
 
-        # Optional preview display
         if active_item:
             box = layout.box()
             col = box.column()
@@ -710,35 +538,11 @@ class MATERIALBROWSER_PT_Panel(Panel):
             if pcoll and active_item.name in pcoll:
                 icon_id = pcoll[active_item.name].icon_id
                 row.template_icon(icon_value=icon_id, scale=10.0)
-                # if icon_id > 0:
-                #     row.label(text="", icon_value=icon_id)
-                # else:
-                #     row.label(text="", icon='ERROR')
             else:
                 row.label(text="", icon='QUESTION')
                 row.scale_y = 10.0
                 row.alignment = 'CENTER'
 
-
-            # if active_item:
-            # if pcoll and active_item.name in pcoll:
-            #     icon_id = pcoll[active_item.name].icon_id
-            #     col.template_icon(icon_value=icon_id, scale=5.0)
-
-            # preview_path = getattr(active_item, "preview_path", "")
-            # pcoll = preview_collections.get("material_thumbs")
-
-            # if pcoll and preview_path in pcoll:
-            #     icon_id = pcoll[preview_path].icon_id
-            #     col.template_icon(icon_value=icon_id, scale=5.0)
-            # else:
-            #     col = col.column()
-            #     col.scale_y = 5.0
-            #     row = col.row()
-            #     row.alignment = 'CENTER'
-            #     row.label(icon='ERROR')
-
-            # Append / Link buttons
             col = layout.column()
             row = col.row(align=True)
 
@@ -758,7 +562,6 @@ class MATERIALBROWSER_PT_Panel(Panel):
         else:
             col.label(text="No materials selected to append / link")
 
-        # Always draw the list
         col.row().template_list(
             "MATERIALBROWSER_UL_items", "materials",
             scn, "material_browser_filtered_items",
@@ -773,7 +576,6 @@ classes = (
     MaterialCache,
     MATERIALBROWSER_UL_items,
     MATERIALBROWSER_PT_Panel,
-    MATERIALBROWSER_OT_Scan,
     MATERIALBROWSER_OT_RefreshCache,
     MATERIALBROWSER_OT_AppendMaterial,
     MATERIALBROWSER_OT_LinkMaterial,
@@ -845,7 +647,6 @@ def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
     
-    # Safely remove all previews
     if not preview_collections:
         for name, pcoll in list(preview_collections.items()):
             bpy.utils.previews.remove(pcoll)
