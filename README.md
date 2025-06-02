@@ -1,27 +1,55 @@
-# tmg-material-browser
-Parse materials in blend files, display material preview in tools panel, & append / link to selected objects.
+# TMG Material Browser
 
-## Requirements
-[Blender 2.80 - 4.4.3]( https://www.blender.org/download/ )
+A Blender add-on for quickly browsing materials from `.blend` files, previewing them directly in the Tools panel, and appending or linking them to selected objects.
 
-## Instructions
-* Save blend file with materials to a folder
-* Install tmg-material-browser.zip file into blender
-* Addon will be in the side Tools panel (N key to toggle)
-* TMG -> Material Browser
-* Inside the Material Browser panel click the folder icon to select the folder containing your blend files
-* This generates a _data folder containing a json file of all materials * a previews folder can be setup containing png images
-* If you add preview images make them 128px png named exactly like your material it references else it wont be detected
-* The refresh button can be used to regenerate the json data if you add / remove materials in the blend file
-* Select objects in the scene to append / link the selected material (Only swaps material slot 0 of selected objects)
+---
 
-## Recomenedations
-* Keep previews around 128px to reduce backround processing
-* .png & .jpg file formats are supported currently (.png have been tested)
-* Loading a max of 200 materials is a good safe range but more can be used if your PC can handle it
-* Using around 25 materisl per blend file is recomended for fast append / linking of materials
-* I store 25 materials in a blend file & have 8 blend files in a folder (200 materials total when accessed) This is optimial for my use case
+## ✅ Requirements
 
-<img width="242" alt="Screenshot 2025-05-31 at 8 53 35 PM" src="https://github.com/user-attachments/assets/031df82e-36ae-4e93-aa87-40e4473b1a55" />
-<img width="1800" alt="Screenshot 2025-05-31 at 8 53 27 PM" src="https://github.com/user-attachments/assets/05ef9cf6-305e-4947-9b00-ded309f7b5be" />
-<img width="1912" alt="Screenshot 2025-05-31 at 9 08 11 PM" src="https://github.com/user-attachments/assets/43523d3e-088e-4137-94ea-9d3c1422aa30" />
+- [Blender 2.80 – 4.4.3](https://www.blender.org/download/)
+
+---
+
+## 📦 Installation
+
+1. Save your `.blend` files containing materials into a folder.
+2. In Blender, install the `tmg-material-browser.zip` add-on via **Edit > Preferences > Add-ons > Install**.
+3. Once enabled, open the **Tools panel** (press `N` key).
+4. Navigate to **TMG → Material Browser**.
+
+---
+
+## 🧪 How to Use
+
+1. Click the 📁 **folder icon** in the Material Browser to select the directory containing your `.blend` files.
+2. The add-on will auto-generate a `_Data` folder with:
+   - A `.json` file listing all materials.
+   - An optional `Previews` folder for `.png` preview images (see below).
+3. **Preview images** must:
+   - Be exactly **128x128 pixels**.
+   - Be named **exactly** like the material they represent.
+   - Be in `.png` format for best compatibility.
+4. Click **Refresh** to update material data when materials are added/removed from `.blend` files.
+5. Select one or more objects in the scene, then click a material in the list to append/link it to **slot 0** of the selected objects.
+
+---
+
+## 💡 Recommendations
+
+- Stick to **128px previews** to keep performance fast and memory usage low.
+- Supported preview formats: `.png` (tested), `.jpg` (partial support).
+- Limit to **200 materials total** for optimal performance (can be increased based on system specs).
+- For best results:
+  - Store around **25 materials per blend file**.
+  - Group them into **multiple .blend files** (e.g., 8 files × 25 materials = 200 total).
+  - This setup provides fast loading, organized structure, and smoother material management.
+
+---
+
+## 🖼️ UI Screenshots
+
+| Material List | Folder Selection | Full Panel View |
+|---|---|---|
+| ![Screenshot 1](https://github.com/user-attachments/assets/031df82e-36ae-4e93-aa87-40e4473b1a55) | ![Screenshot 2](https://github.com/user-attachments/assets/05ef9cf6-305e-4947-9b00-ded309f7b5be) | ![Screenshot 3](https://github.com/user-attachments/assets/43523d3e-088e-4137-94ea-9d3c1422aa30) |
+
+---
